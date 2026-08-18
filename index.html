@@ -276,12 +276,12 @@
 
     <script>
         const targetRoutes = [
-            { route: "788", stopId: "001259", dest: "往 中環" },
-            { route: "789", stopId: "001259", dest: "往 金鐘" },
-            { route: "8P",  stopId: "001259", dest: "往 灣仔碼頭" },
-            { route: "82",  stopId: "001259", dest: "往 北角碼頭" },
-            { route: "85",  stopId: "001259", dest: "往 寶馬山" },
-            { route: "82X", stopId: "001259", dest: "往 鰂魚涌" }
+            { route: "788", stopId: "002543", dest: "往 中環" },
+            { route: "789", stopId: "002543", dest: "往 金鐘" },
+            { route: "8P",  stopId: "002543", dest: "往 灣仔碼頭" },
+            { route: "82",  stopId: "002543", dest: "往 北角碼頭" },
+            { route: "85",  stopId: "002543", dest: "往 寶馬山" },
+            { route: "82X", stopId: "002543", dest: "往 鰂魚涌" }
         ];
 
         function updateClock() {
@@ -328,45 +328,19 @@
 
             for (let bus of targetRoutes) {
                 try {
+                    const res = await fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/eta/CTB/${bus.stopId}/${bus.route}`);
+                    const data = await res.json();
+
                     let busList = [];
-
-                    // 1. 嘗試直接抓取路線全圖 API 取得出發 (O 方向) 第一站 (seq=1) 班次
-                    try {
-                        const routeRes = await fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/route-eta/CTB/${bus.route}`);
-                        const routeData = await routeRes.json();
-                        if (routeData.data && routeData.data.length > 0) {
-                            busList = routeData.data.filter(item => 
-                                (item.dir === "O" || item.dir === "o") && 
-                                item.eta && item.eta !== ""
-                            );
-                        }
-                    } catch (e) {
-                        console.warn(`Route API failed for ${bus.route}, falling back to Stop API`, e);
+                    if (data.data && Array.isArray(data.data)) {
+                        busList = data.data.filter(item => item.eta && item.eta.trim() !== "");
                     }
 
-                    // 2. 備用方案：使用指定站點 API (001259 小西灣藍灣半島)
-                    if (busList.length === 0) {
-                        const stopRes = await fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/eta/CTB/${bus.stopId}/${bus.route}`);
-                        const stopData = await stopRes.json();
-                        if (stopData.data && stopData.data.length > 0) {
-                            busList = stopData.data.filter(item => item.eta && item.eta !== "");
-                        }
-                    }
-
-                    // 排序與去重
                     busList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
-                    const uniqueBusList = [];
-                    const seenTimes = new Set();
-                    for (let item of busList) {
-                        if (!seenTimes.has(item.eta)) {
-                            seenTimes.add(item.eta);
-                            uniqueBusList.push(item);
-                        }
-                    }
 
-                    let firstBus = uniqueBusList[0];
-                    let secondBus = uniqueBusList[1];
-                    let thirdBus = uniqueBusList[2];
+                    let firstBus = busList[0];
+                    let secondBus = busList[1];
+                    let thirdBus = busList[2];
 
                     let etaText = "未有班次";
                     let clockText = "--:--";
