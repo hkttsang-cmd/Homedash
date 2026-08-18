@@ -276,12 +276,12 @@
 
     <script>
         const targetRoutes = [
-            { route: "788", stopId: "002543", dest: "往 中環" },
-            { route: "789", stopId: "002543", dest: "往 金鐘" },
-            { route: "8P",  stopId: "002543", dest: "往 灣仔碼頭" },
-            { route: "82",  stopId: "002543", dest: "往 北角碼頭" },
-            { route: "85",  stopId: "002543", dest: "往 寶馬山" },
-            { route: "82X", stopId: "002543", dest: "往 鰂魚涌" }
+            { route: "788", dest: "往 中環" },
+            { route: "789", dest: "往 金鐘" },
+            { route: "8P",  dest: "往 灣仔碼頭" },
+            { route: "82",  dest: "往 北角碼頭" },
+            { route: "85",  dest: "往 寶馬山" },
+            { route: "82X", dest: "往 鰂魚涌" }
         ];
 
         function updateClock() {
@@ -328,19 +328,28 @@
 
             for (let bus of targetRoutes) {
                 try {
-                    const res = await fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/eta/CTB/${bus.stopId}/${bus.route}`);
-                    const data = await res.json();
+                    const [resOut, resIn] = await Promise.all([
+                        fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/eta/CTB/002543/${bus.route}`).then(r => r.json()).catch(() => ({data: []})),
+                        fetch(`https://rt.data.gov.hk/v1/transport/citybus-nwfb/eta/CTB/001259/${bus.route}`).then(r => r.json()).catch(() => ({data: []}))
+                    ]);
 
-                    let busList = [];
-                    if (data.data && Array.isArray(data.data)) {
-                        busList = data.data.filter(item => item.eta && item.eta.trim() !== "");
-                    }
+                    let rawData = [...(resOut.data || []), ...(resIn.data || [])];
+                    let busList = rawData.filter(item => item.eta && item.eta.trim() !== "");
 
                     busList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                    let firstBus = busList[0];
-                    let secondBus = busList[1];
-                    let thirdBus = busList[2];
+                    let uniqueBuses = [];
+                    let seenTimes = new Set();
+                    for (let b of busList) {
+                        if (!seenTimes.has(b.eta)) {
+                            seenTimes.add(b.eta);
+                            uniqueBuses.push(b);
+                        }
+                    }
+
+                    let firstBus = uniqueBuses[0];
+                    let secondBus = uniqueBuses[1];
+                    let thirdBus = uniqueBuses[2];
 
                     let etaText = "未有班次";
                     let clockText = "--:--";
